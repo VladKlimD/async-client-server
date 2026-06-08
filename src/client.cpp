@@ -15,9 +15,18 @@ void Client::run()
 {
     for (std::size_t i = 0; i < m_commandsCount; ++i)
     {
+        Command command { makeCommand(i) };
         const auto sentAt { std::chrono::steady_clock::now() };
 
-        m_commandHandler(makeCommand(i), [this, sentAt](const CommandResult& result)
+        {
+            std::lock_guard<std::mutex> printMutex { g_printMutex };
+            std::cout
+                << "Client " << m_id
+                << " sent " << commandTypeToString(command.type)
+                << " command: " << command.data << '\n';
+        }
+
+        m_commandHandler(std::move(command), [this, sentAt](const CommandResult& result)
         {
             handleResult(sentAt, result);
         });
@@ -25,17 +34,6 @@ void Client::run()
 
     std::unique_lock<std::mutex> lock { m_mutex };
     m_conditionVariable.wait(lock, [this]() { return m_completedCommands == m_commandsCount; });
-
-    {
-        const auto averageTime { m_totalTime / static_cast<int64_t>(m_commandsCount) };
-        std::lock_guard<std::mutex> printMutex { g_printMutex };
-
-        std::cout
-            << "Client " << m_id << " statistics: "
-            << "min=" << m_minTime.count() << " ms, "
-            << "max=" << m_maxTime.count() << " ms, "
-            << "avg=" << averageTime.count() << " ms\n";
-    }
 }
 
 Command Client::makeCommand(const std::size_t index) const
@@ -62,7 +60,7 @@ Command Client::makeCommand(const std::size_t index) const
     };
 }
 
-void Client::handleResult(const std::chrono::steady_clock::time_point sentAt, const CommandResult&)
+void Client::handleResult(const std::chrono::steady_clock::time_point sentAt, const CommandResult& result)
 {
     const auto receivedAt { std::chrono::steady_clock::now() };
     const auto responseTime
@@ -70,24 +68,36 @@ void Client::handleResult(const std::chrono::steady_clock::time_point sentAt, co
         std::chrono::duration_cast<std::chrono::milliseconds>(receivedAt - sentAt)
     };
 
-    std::lock_guard<std::mutex> lock { m_mutex };
+    {
+        std::lock_guard<std::mutex> lock { m_mutex };
 
-    if (m_completedCommands == 0)
-    {
-        m_minTime = responseTime;
-        m_maxTime = responseTime;
-    }
-    else
-    {
-        if (responseTime < m_minTime)
+        if (m_completedCommands == 0)
+        {
             m_minTime = responseTime;
-
-        if (responseTime > m_maxTime)
             m_maxTime = responseTime;
+        }
+        else
+        {
+            if (responseTime < m_minTime)
+                m_minTime = responseTime;
+
+            if (responseTime > m_maxTime)
+                m_maxTime = responseTime;
+        }
+
+        m_totalTime += responseTime;
+        ++m_completedCommands;
     }
 
-    m_totalTime += responseTime;
-    ++m_completedCommands;
+    {
+        std::lock_guard<std::mutex> printMutex { g_printMutex };
+        std::cout
+            << "Client " << m_id
+            << " received result for " << commandTypeToString(result.type)
+            << " command: " << result.data
+            << ", server time: " << result.executionTime.count() << " ms"
+            << ", response time: " << responseTime.count() << " ms\n";
+    }
 
     m_conditionVariable.notify_one();
 }

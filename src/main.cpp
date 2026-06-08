@@ -28,7 +28,7 @@ int main(int argc, char* argv[])
     // Инициализируем коллбэк отправки команды
     const CommandHandler commandHandler { [&server](Command command, ResultCallback resultCallback)
     {
-        server.executeCommand(std::move(command), std::move(resultCallback));
+        server.executeCommandAsync(std::move(command), std::move(resultCallback));
     }};
 
     std::vector<std::unique_ptr<Client>> clients;

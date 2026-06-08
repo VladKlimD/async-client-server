@@ -6,6 +6,7 @@
 #include <condition_variable>
 #include <mutex>
 
+// Эмулятор реального клиента
 class Client
 {
 public:

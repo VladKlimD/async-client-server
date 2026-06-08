@@ -11,6 +11,7 @@ Server::Server(std::size_t workersCount)
 
     for (std::size_t i = 0; i < workersCount; ++i)
     {
+        // Запускаем основные worker loop для каждого потока
         m_workers.emplace_back(&Server::workerLoop, this);
     }
 }
@@ -24,6 +25,7 @@ Server::~Server()
 
     m_conditionVariable.notify_all();
 
+    // Ожидаем завершения всех worker потоков
     for (std::thread& worker : m_workers)
     {
         if (worker.joinable())
@@ -33,19 +35,22 @@ Server::~Server()
     }
 }
 
-void Server::executeCommand(Command command, ResultCallback callback)
+void Server::executeCommandAsync(Command command, ResultCallback callback)
 {
     {
         std::lock_guard<std::mutex> lock { m_mutex };
 
+        // Проверка что сервер не остановлен
         if (m_stopped)
         {
             return;
         }
 
+        // Складываем задачу в очередь
         m_queue.push(Task { std::move(command), std::move(callback) });
     }
 
+    // Будим один worker поток
     m_conditionVariable.notify_one();
 }
 
@@ -58,6 +63,7 @@ void Server::workerLoop()
         {
             std::unique_lock<std::mutex> lock { m_mutex };
 
+            // Ожидаем появление задачи
             m_conditionVariable.wait(lock, [this]()
             {
                 return m_stopped || !m_queue.empty();
@@ -72,7 +78,9 @@ void Server::workerLoop()
             m_queue.pop();
         }
 
+        // Выполняем задачу
         const CommandResult result { processCommand(task.command) };
+        // Вызываем callback уведомление о завершенной задачи
         task.callback(result);
     }
 }

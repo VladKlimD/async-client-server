@@ -17,6 +17,21 @@ struct Command
     std::string data;
 };
 
+inline std::string commandTypeToString(const CommandType type)
+{
+    switch (type)
+    {
+        case CommandType::Fast:
+            return "Fast";
+        case CommandType::Medium:
+            return "Medium";
+        case CommandType::Slow:
+            return "Slow";
+    }
+
+    return "Unknown";
+}
+
 struct CommandResult
 {
     CommandType type;
