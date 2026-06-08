@@ -1,94 +1,64 @@
+#include "options_parser.hpp"
+#include "server.h"
+#include "client.h"
+
 #include <iostream>
-#include <limits>
-#include <sstream>
-#include <string>
-
-struct ProgramOptions
-{
-    size_t clientsCount { 0 };
-    size_t commandsPerClient { 0 };
-};
-
-bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
-{
-    const auto printUsage = [argv]()
-    {
-        std::cout
-            << "Usage:\n"
-            << "  " << argv[0] << " <clients_count> <commands_per_client>\n"
-            << "  " << argv[0] << "\n";
-    };
-
-    const auto parsePositiveSize = [](const std::string& text, size_t& value)
-    {
-        if (text.empty())
-            return false;
-
-        for (const char ch : text)
-        {
-            if (!std::isdigit(static_cast<unsigned char>(ch)))
-            {
-                return false;
-            }
-        }
-
-        std::istringstream stream { text };
-        size_t parsed { 0 };
-        stream >> parsed;
-
-        if (!stream || parsed == 0 || parsed > std::numeric_limits<size_t>::max())
-        {
-            return false;
-        }
-
-        value = static_cast<size_t>(parsed);
-        return true;
-    };
-
-    std::string clientsCount;
-    std::string commandsPerClient;
-
-    if (argc == 1)
-    {
-        std::cout << "Enter clients count: ";
-        std::cin >> clientsCount;
-
-        std::cout << "Enter commands per client: ";
-        std::cin >> commandsPerClient;
-    }
-    else if (argc == 3)
-    {
-        clientsCount = argv[1];
-        commandsPerClient = argv[2];
-    }
-    else
-    {
-        printUsage();
-        return false;
-    }
-
-    if (!parsePositiveSize(clientsCount, options.clientsCount) ||
-        !parsePositiveSize(commandsPerClient, options.commandsPerClient))
-    {
-        printUsage();
-        return false;
-    }
-
-    return true;
-}
+#include <vector>
+#include <thread>
+#include <functional>
+#include <memory>
 
 int main(int argc, char* argv[])
 {
-    ProgramOptions options;
+    ProgramOptions programOptions;
 
-    if (!parseProgramOptions(argc, argv, options))
+    // Парсинг аргументов
+    if (!parseProgramOptions(argc, argv, programOptions))
     {
         return 1;
     }
 
     std::cout
-        << "Clients count: " << options.clientsCount << '\n'
-        << "Commands per client: " << options.commandsPerClient << '\n';
+        << "Clients count: " << programOptions.clientsCount << '\n'
+        << "Commands per client: " << programOptions.commandsPerClient << '\n';
+
+    // Создаем сервер, передаем максимальное количество потоков
+    Server server { std::thread::hardware_concurrency() };
+
+    // Инициализируем коллбэк отправки команды
+    const CommandHandler commandHandler { [&server](Command command, ResultCallback resultCallback)
+    {
+        server.executeCommand(std::move(command), std::move(resultCallback));
+    }};
+
+    std::vector<std::unique_ptr<Client>> clients;
+    std::vector<std::thread> clientsThreads;
+
+    clients.reserve(programOptions.clientsCount);
+    clientsThreads.reserve(programOptions.clientsCount);
+
+    // Создаем клиенты динамически, чтобы избежать перемещения (mutex и cv внутри)
+    for (std::size_t i = 0; i < programOptions.clientsCount; ++i)
+    {
+        clients.emplace_back(new Client
+        {
+            i + 1,
+            programOptions.commandsPerClient,
+            commandHandler
+        });
+    }
+
+    // Создаем потоки для каждого клиента и запускаем их в работу
+    for (std::unique_ptr<Client>& client : clients)
+    {
+        clientsThreads.emplace_back(&Client::run, client.get());
+    }
+
+    // Дожидаемся окончания работы клиентов
+    for (std::thread& thread : clientsThreads)
+    {
+        thread.join();
+    }
 
     return 0;
 }
