@@ -1,4 +1,3 @@
-#include <cctype>
 #include <iostream>
 #include <limits>
 #include <sstream>
@@ -6,8 +5,8 @@
 
 struct ProgramOptions
 {
-    std::size_t clients_count = 0;
-    std::size_t commands_per_client = 0;
+    size_t clientsCount { 0 };
+    size_t commandsPerClient { 0 };
 };
 
 bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
@@ -20,7 +19,7 @@ bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
             << "  " << argv[0] << "\n";
     };
 
-    const auto parsePositiveSize = [](const std::string& text, std::size_t& value)
+    const auto parsePositiveSize = [](const std::string& text, size_t& value)
     {
         if (text.empty())
             return false;
@@ -34,15 +33,15 @@ bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
         }
 
         std::istringstream stream { text };
-        unsigned long long parsed { 0 };
+        size_t parsed { 0 };
         stream >> parsed;
 
-        if (!stream || parsed == 0 || parsed > std::numeric_limits<std::size_t>::max())
+        if (!stream || parsed == 0 || parsed > std::numeric_limits<size_t>::max())
         {
             return false;
         }
 
-        value = static_cast<std::size_t>(parsed);
+        value = static_cast<size_t>(parsed);
         return true;
     };
 
@@ -68,8 +67,8 @@ bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
         return false;
     }
 
-    if (!parsePositiveSize(clientsCount, options.clients_count) ||
-        !parsePositiveSize(commandsPerClient, options.commands_per_client))
+    if (!parsePositiveSize(clientsCount, options.clientsCount) ||
+        !parsePositiveSize(commandsPerClient, options.commandsPerClient))
     {
         printUsage();
         return false;
@@ -88,8 +87,8 @@ int main(int argc, char* argv[])
     }
 
     std::cout
-        << "Clients count: " << options.clients_count << '\n'
-        << "Commands per client: " << options.commands_per_client << '\n';
+        << "Clients count: " << options.clientsCount << '\n'
+        << "Commands per client: " << options.commandsPerClient << '\n';
 
     return 0;
 }
