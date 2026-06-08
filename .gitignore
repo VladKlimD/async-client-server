@@ -1,0 +1,6 @@
+.vscode/
+.idea/
+.PVS-Studio
+.qtcreator/
+*build*/
+*.user
