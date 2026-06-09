@@ -51,12 +51,14 @@ void Client::run()
         };
         std::lock_guard<std::mutex> printMutex { g_printMutex };
         std::cout
+            << "\n*************************\n"
             << "Client " << m_id
-            << " statistics: completed commands: " << completedCommands
-            << ", total response time: " << totalTime.count() << " ms"
-            << ", min response time: " << minTime.count() << " ms"
-            << ", max response time: " << maxTime.count() << " ms"
-            << ", average response time: " << averageTime.count() << " ms\n";
+            << " statistics: \ncompleted commands: " << completedCommands
+            << ", \ntotal response time: " << totalTime.count() << " ms"
+            << ", \nmin response time: " << minTime.count() << " ms"
+            << ", \nmax response time: " << maxTime.count() << " ms"
+            << ", \naverage response time: " << averageTime.count() << " ms\n"
+            << "*************************\n";
     }
 }
 

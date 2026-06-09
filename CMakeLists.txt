@@ -3,6 +3,8 @@ project(async_client_server)
 
 set(CMAKE_CXX_STANDARD 14)
 
+find_package(Threads REQUIRED)
+
 add_executable(async_client_server
         src/main.cpp
         src/server.cpp
@@ -12,5 +14,5 @@ add_executable(async_client_server
         src/client.cpp
         src/client.h)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-        src)
+target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
+target_include_directories(${PROJECT_NAME} PRIVATE src)
