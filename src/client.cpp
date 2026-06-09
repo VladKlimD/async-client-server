@@ -16,7 +16,6 @@ void Client::run()
     for (std::size_t i = 0; i < m_commandsCount; ++i)
     {
         Command command { makeCommand(i) };
-        const auto sentAt { std::chrono::steady_clock::now() };
 
         {
             std::lock_guard<std::mutex> printMutex { g_printMutex };
@@ -26,6 +25,7 @@ void Client::run()
                 << " command: " << command.data << '\n';
         }
 
+        const auto sentAt { std::chrono::steady_clock::now() };
         m_commandHandler(std::move(command), [this, sentAt](const CommandResult& result)
         {
             handleResult(sentAt, result);

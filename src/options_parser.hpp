@@ -14,6 +14,14 @@ struct ProgramOptions
 
 inline bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
 {
+    const auto printUsage = [](const char* applicationName)
+    {
+        std::cerr
+            << "Usage: async_client_server"
+            << " <clients_count> <commands_per_client>\n"
+            << "Both values must be positive integers.\n";
+    };
+
     const auto parsePositiveSize = [](const std::string& text, std::size_t& value)
     {
         if (text.empty())
@@ -58,12 +66,16 @@ inline bool parseProgramOptions(int argc, char* argv[], ProgramOptions& options)
     }
     else
     {
+        std::cerr << "Invalid arguments count.\n";
+        printUsage(argv[0]);
         return false;
     }
 
     if (!parsePositiveSize(clientsCount, options.clientsCount) ||
         !parsePositiveSize(commandsPerClient, options.commandsPerClient))
     {
+        std::cerr << "Invalid arguments.\n";
+        printUsage(argv[0]);
         return false;
     }
 

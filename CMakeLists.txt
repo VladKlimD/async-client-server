@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 4.1)
+cmake_minimum_required(VERSION 3.26)
 project(async_client_server)
 
 set(CMAKE_CXX_STANDARD 14)
