@@ -34,6 +34,30 @@ void Client::run()
 
     std::unique_lock<std::mutex> lock { m_mutex };
     m_conditionVariable.wait(lock, [this]() { return m_completedCommands == m_commandsCount; });
+
+    const std::size_t completedCommands { m_completedCommands };
+    const auto totalTime { m_totalTime };
+    const auto minTime { m_minTime };
+    const auto maxTime { m_maxTime };
+    lock.unlock();
+
+    {
+        const auto averageTime
+        {
+            std::chrono::milliseconds
+            {
+                totalTime.count() / static_cast<std::chrono::milliseconds::rep>(completedCommands)
+            }
+        };
+        std::lock_guard<std::mutex> printMutex { g_printMutex };
+        std::cout
+            << "Client " << m_id
+            << " statistics: completed commands: " << completedCommands
+            << ", total response time: " << totalTime.count() << " ms"
+            << ", min response time: " << minTime.count() << " ms"
+            << ", max response time: " << maxTime.count() << " ms"
+            << ", average response time: " << averageTime.count() << " ms\n";
+    }
 }
 
 Command Client::makeCommand(const std::size_t index) const
@@ -89,7 +113,7 @@ void Client::handleResult(const std::chrono::steady_clock::time_point sentAt, co
         ++m_completedCommands;
     }
 
-    {
+    /*{
         std::lock_guard<std::mutex> printMutex { g_printMutex };
         std::cout
             << "Client " << m_id
@@ -97,7 +121,7 @@ void Client::handleResult(const std::chrono::steady_clock::time_point sentAt, co
             << " command: " << result.data
             << ", server time: " << result.executionTime.count() << " ms"
             << ", response time: " << responseTime.count() << " ms\n";
-    }
+    }*/
 
     m_conditionVariable.notify_one();
 }
