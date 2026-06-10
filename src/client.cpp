@@ -13,6 +13,8 @@ Client::Client(const std::size_t id, const std::size_t commandsCount, CommandHan
 
 void Client::run()
 {
+    const auto startedAt { std::chrono::steady_clock::now() };
+
     for (std::size_t i = 0; i < m_commandsCount; ++i)
     {
         Command command { makeCommand(i) };
@@ -36,28 +38,47 @@ void Client::run()
     m_conditionVariable.wait(lock, [this]() { return m_completedCommands == m_commandsCount; });
 
     const std::size_t completedCommands { m_completedCommands };
-    const auto totalTime { m_totalTime };
-    const auto minTime { m_minTime };
-    const auto maxTime { m_maxTime };
+    const auto totalResponseTime { m_totalResponseTime };
+    const auto minResponseTime { m_minResponseTime };
+    const auto maxResponseTime { m_maxResponseTime };
+    const auto totalServerExecutionTime { m_totalServerExecutionTime };
     lock.unlock();
 
     {
-        const auto averageTime
+        const auto finishedAt { std::chrono::steady_clock::now() };
+        const auto clientElapsedTime
         {
-            std::chrono::milliseconds
-            {
-                totalTime.count() / static_cast<std::chrono::milliseconds::rep>(completedCommands)
-            }
+            std::chrono::duration_cast<std::chrono::milliseconds>(finishedAt - startedAt)
+        };
+        const auto completedCommandsCount
+        {
+            static_cast<std::chrono::milliseconds::rep>(completedCommands)
+        };
+        const auto averageResponseTime
+        {
+            completedCommands == 0
+                ? std::chrono::milliseconds { 0 }
+                : std::chrono::milliseconds { totalResponseTime.count() / completedCommandsCount }
+        };
+        const auto averageServerExecutionTime
+        {
+            completedCommands == 0
+                ? std::chrono::milliseconds { 0 }
+                : std::chrono::milliseconds { totalServerExecutionTime.count() / completedCommandsCount }
         };
         std::lock_guard<std::mutex> printMutex { g_printMutex };
         std::cout
             << "\n*************************\n"
             << "Client " << m_id
-            << " statistics: \ncompleted commands: " << completedCommands
-            << ", \ntotal response time: " << totalTime.count() << " ms"
-            << ", \nmin response time: " << minTime.count() << " ms"
-            << ", \nmax response time: " << maxTime.count() << " ms"
-            << ", \naverage response time: " << averageTime.count() << " ms\n"
+            << " statistics:\n"
+            << "completed commands: " << completedCommands << '\n'
+            << "client elapsed time: " << clientElapsedTime.count() << " ms\n"
+            << "response time total: " << totalResponseTime.count() << " ms\n"
+            << "response time min: " << minResponseTime.count() << " ms\n"
+            << "response time max: " << maxResponseTime.count() << " ms\n"
+            << "response time average: " << averageResponseTime.count() << " ms\n"
+            << "server execution time total: " << totalServerExecutionTime.count() << " ms\n"
+            << "server execution time average: " << averageServerExecutionTime.count() << " ms\n"
             << "*************************\n";
     }
 }
@@ -99,19 +120,20 @@ void Client::handleResult(const std::chrono::steady_clock::time_point sentAt, co
 
         if (m_completedCommands == 0)
         {
-            m_minTime = responseTime;
-            m_maxTime = responseTime;
+            m_minResponseTime = responseTime;
+            m_maxResponseTime = responseTime;
         }
         else
         {
-            if (responseTime < m_minTime)
-                m_minTime = responseTime;
+            if (responseTime < m_minResponseTime)
+                m_minResponseTime = responseTime;
 
-            if (responseTime > m_maxTime)
-                m_maxTime = responseTime;
+            if (responseTime > m_maxResponseTime)
+                m_maxResponseTime = responseTime;
         }
 
-        m_totalTime += responseTime;
+        m_totalResponseTime += responseTime;
+        m_totalServerExecutionTime += result.executionTime;
         ++m_completedCommands;
     }
 

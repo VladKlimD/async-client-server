@@ -26,7 +26,8 @@ private:
     std::condition_variable m_conditionVariable;
     std::size_t m_completedCommands { 0 };
 
-    std::chrono::milliseconds m_totalTime { 0 };
-    std::chrono::milliseconds m_minTime { 0 };
-    std::chrono::milliseconds m_maxTime { 0 };
+    std::chrono::milliseconds m_totalResponseTime { 0 };
+    std::chrono::milliseconds m_minResponseTime { 0 };
+    std::chrono::milliseconds m_maxResponseTime { 0 };
+    std::chrono::milliseconds m_totalServerExecutionTime { 0 };
 };
