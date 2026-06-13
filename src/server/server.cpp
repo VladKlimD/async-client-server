@@ -9,6 +9,8 @@ Server::Server(const std::size_t workersCount)
     : m_requestTracker { std::make_unique<RequestTracker>() }, m_executor { workersCount }
 {}
 
+Server::~Server() = default;
+
 void Server::calculateSinSlow(const CommandContext context, double angleRadians, SinSlowResultCallback callback)
 {
     m_requestTracker->markPending(context, "sin_slow");

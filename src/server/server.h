@@ -47,7 +47,7 @@ public:
     using CosMediumResultCallback = std::function<void(CommandResult, double)>;
 
     explicit Server(std::size_t workersCount);
-    ~Server() = default;
+    ~Server();
 
     // Асинхронный расчет sin с долгим выполнением
     void calculateSinSlow(CommandContext context, double angleRadians, SinSlowResultCallback callback);
