@@ -7,12 +7,17 @@ find_package(Threads REQUIRED)
 
 add_executable(async_client_server
         src/main.cpp
-        src/server.cpp
-        src/server.h
-        src/options_parser.hpp
-        src/command.h
-        src/client.cpp
-        src/client.h)
+        src/client/client.cpp
+        src/client/client.h
+        src/client/client_network.cpp
+        src/client/client_network.h
+        src/fake_transport.cpp
+        src/fake_transport.h
+        src/server/server.cpp
+        src/server/server.h
+        src/server/server_network.cpp
+        src/server/server_network.h
+        src/options_parser.hpp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads)
 target_include_directories(${PROJECT_NAME} PRIVATE src)

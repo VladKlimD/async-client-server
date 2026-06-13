@@ -1,11 +1,12 @@
+#include "client/client.h"
+#include "fake_transport.h"
 #include "options_parser.hpp"
-#include "server.h"
-#include "client.h"
+#include "server/server.h"
+#include "server/server_network.h"
 
 #include <iostream>
 #include <vector>
 #include <thread>
-#include <functional>
 #include <memory>
 
 int main(int argc, char* argv[])
@@ -25,11 +26,19 @@ int main(int argc, char* argv[])
     // Создаем сервер, передаем максимальное количество потоков
     Server server { std::thread::hardware_concurrency() };
 
-    // Инициализируем коллбэк отправки команды
-    const CommandHandler commandHandler { [&server](Command command, ResultCallback resultCallback)
-    {
-        server.executeCommandAsync(std::move(command), std::move(resultCallback));
-    }};
+    // Имитация сетевого транспорта
+    FakeTransport transport;
+
+    // Коллбэк отправки ответа клиенту
+    ServerNetwork::ResponseHandler responseHandler { [&transport](const std::string& response)
+        { transport.sendToClient(response); }};
+    // Серверная сетевая прослойка
+    ServerNetwork serverNetwork { server, responseHandler };
+
+    // Коллбэк отправки запроса серверу
+    FakeTransport::ServerHandler serverHandler { [&serverNetwork](const std::string& request)
+        { serverNetwork.receive(request); }};
+    transport.setServerHandler(serverHandler);
 
     std::vector<std::unique_ptr<Client>> clients;
     std::vector<std::thread> clientsThreads;
@@ -44,7 +53,7 @@ int main(int argc, char* argv[])
         {
             i + 1,
             programOptions.commandsPerClient,
-            commandHandler
+            transport
         });
     }
 
