@@ -15,7 +15,9 @@ public:
     FakeTransport() = default;
     explicit FakeTransport(ServerHandler serverHandler);
 
+    // Установка обработчика запросов сервера
     void setServerHandler(ServerHandler serverHandler);
+    // Регистрация обработчика ответов клиента
     void registerClient(std::uint64_t clientId, ClientResponseHandler responseHandler);
     void unregisterClient(std::uint64_t clientId);
 
@@ -23,6 +25,7 @@ public:
     bool sendToClient(const std::string& response) const;
 
 private:
+    // Извлекает clientId из строкового пакета
     static bool parseClientId(const std::string& data, std::uint64_t& clientId);
 
     ServerHandler m_serverHandler;

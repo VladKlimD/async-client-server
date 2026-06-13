@@ -1,14 +1,16 @@
 #pragma once
 
-#include <queue>
-#include <mutex>
-#include <condition_variable>
-#include <functional>
+#include "command_executor.h"
+
 #include <chrono>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
-#include <thread>
+
+class RequestTracker;
 
 class Server
 {
@@ -26,41 +28,47 @@ public:
         std::chrono::milliseconds executionTime {};
     };
 
+    enum class CommandStatus
+    {
+        Pending,
+        Completed
+    };
+
+    struct CommandReport
+    {
+        CommandContext context;
+        std::string commandName;
+        CommandStatus status { CommandStatus::Pending };
+        std::chrono::milliseconds executionTime {};
+    };
+
     using ResultCallback = std::function<void(CommandResult)>;
     using SinSlowResultCallback = std::function<void(CommandResult, double)>;
     using CosMediumResultCallback = std::function<void(CommandResult, double)>;
 
     explicit Server(std::size_t workersCount);
-    ~Server();
+    ~Server() = default;
 
+    // Асинхронный расчет sin с долгим выполнением
     void calculateSinSlow(CommandContext context, double angleRadians, SinSlowResultCallback callback);
+    // Асинхронный расчет cos со средним временем выполнения
     void calculateCosMedium(CommandContext context, double angleRadians, CosMediumResultCallback callback);
+    // Асинхронное выполнение быстрой команды
     void executeFastCommand(CommandContext context, ResultCallback callback);
 
-private:
-    using TaskHandler = std::function<void(CommandContext)>;
+    // Возвращает клиентов с незавершенными командами
+    std::vector<std::uint64_t> waitingClientIds() const;
+    // Возвращает отчеты по командам клиента
+    std::vector<CommandReport> clientReports(std::uint64_t clientId) const;
 
-    void enqueue(CommandContext context, TaskHandler handler);
-    void workerLoop();
-    void executeSinSlow(CommandContext context, double angleRadians, const SinSlowResultCallback& callback);
-    void executeCosMedium(CommandContext context, double angleRadians, const CosMediumResultCallback& callback);
-    void executeFast(CommandContext context, const ResultCallback& callback);
+private:
+    // Выполнение команд в отдельном worker потоке через executor
+    void executeSinSlow(CommandContext context, double angleRadians, const SinSlowResultCallback& callback) const;
+    void executeCosMedium(CommandContext context, double angleRadians, const CosMediumResultCallback& callback) const;
+    void executeFast(CommandContext context, const ResultCallback& callback) const;
+    // Формирует результат выполненной команды
     static CommandResult makeCommandResult(CommandContext context, std::chrono::steady_clock::time_point startedAt);
 
-    struct Task
-    {
-        CommandContext context;
-        TaskHandler handler;
-    };
-
-    // Очередь задач
-    std::queue<Task> m_queue;
-    // Защита очереди и флага остановки
-    std::mutex m_mutex;
-    // Ожидание задач worker потоками
-    std::condition_variable m_conditionVariable;
-    // Пул рабочих потоков
-    std::vector<std::thread> m_workers;
-    // Признак остановки сервера
-    bool m_stopped { false };
+    std::unique_ptr<RequestTracker> m_requestTracker;
+    CommandExecutor m_executor;
 };

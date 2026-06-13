@@ -28,6 +28,7 @@ public:
     ClientNetwork(std::uint64_t clientId, FakeTransport& transport);
     ~ClientNetwork();
 
+    // Отправка команд на сервер
     std::uint64_t executeFastCommand(ResultCallback callback);
     std::uint64_t calculateSinSlow(double angleRadians, SinSlowResultCallback callback);
     std::uint64_t calculateCosMedium(double angleRadians, CosMediumResultCallback callback);
@@ -55,8 +56,11 @@ private:
     void completeRequest(std::uint64_t requestId, Response response);
     void failRequest(std::uint64_t requestId, const std::string& error);
 
+    // Сериализует запрос в строковый пакет
     static std::string serializeRequest(const Request& request);
+    // Формирует строковый аргумент из double
     static std::string makeDoubleArgument(double value);
+    // Парсит строковый пакет ответа
     static bool parseResponse(const std::string& data, Response& response);
 
     std::uint64_t m_clientId {};

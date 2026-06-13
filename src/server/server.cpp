@@ -1,123 +1,64 @@
 #include "server.h"
+#include "request_tracker.h"
 
 #include <cmath>
+#include <memory>
 #include <utility>
 
-Server::Server(std::size_t workersCount)
-{
-    if (workersCount == 0)
-    {
-        workersCount = 1;
-    }
-
-    m_workers.reserve(workersCount);
-
-    for (std::size_t i = 0; i < workersCount; ++i)
-    {
-        // Запускаем основные worker loop для каждого потока
-        m_workers.emplace_back(&Server::workerLoop, this);
-    }
-}
-
-Server::~Server()
-{
-    {
-        std::lock_guard<std::mutex> lock { m_mutex };
-        m_stopped = true;
-    }
-
-    m_conditionVariable.notify_all();
-
-    // Ожидаем завершения всех worker потоков
-    for (std::thread& worker : m_workers)
-    {
-        if (worker.joinable())
-        {
-            worker.join();
-        }
-    }
-}
+Server::Server(const std::size_t workersCount)
+    : m_requestTracker { std::make_unique<RequestTracker>() }, m_executor { workersCount }
+{}
 
 void Server::calculateSinSlow(const CommandContext context, double angleRadians, SinSlowResultCallback callback)
 {
-    enqueue(context, [this, angleRadians, callback = std::move(callback)](const CommandContext taskContext) mutable
-    {
-        executeSinSlow(taskContext, angleRadians, callback);
-    });
+    m_requestTracker->markPending(context, "sin_slow");
+
+    const CommandExecutor::Task task = [this, context, angleRadians, callback = std::move(callback)]() mutable
+        { executeSinSlow(context, angleRadians, callback); };
+
+    m_executor.enqueue(task);
 }
 
 void Server::calculateCosMedium(const CommandContext context, double angleRadians, CosMediumResultCallback callback)
 {
-    enqueue(context, [this, angleRadians, callback = std::move(callback)](const CommandContext taskContext) mutable
-    {
-        executeCosMedium(taskContext, angleRadians, callback);
-    });
+    m_requestTracker->markPending(context, "cos_medium");
+
+    const CommandExecutor::Task task = [this, context, angleRadians, callback = std::move(callback)]() mutable
+        { executeCosMedium(context, angleRadians, callback); };
+
+    m_executor.enqueue(task);
 }
 
 void Server::executeFastCommand(const CommandContext context, ResultCallback callback)
 {
-    enqueue(context, [this, callback = std::move(callback)](CommandContext taskContext) mutable
-    {
-        executeFast(taskContext, callback);
-    });
+    m_requestTracker->markPending(context, "fast");
+
+    const CommandExecutor::Task task = [this, context, callback = std::move(callback)]() mutable
+        { executeFast(context, callback); };
+
+    m_executor.enqueue(task);
 }
 
-void Server::enqueue(const CommandContext context, TaskHandler handler)
+std::vector<std::uint64_t> Server::waitingClientIds() const
 {
-    {
-        std::lock_guard<std::mutex> lock { m_mutex };
-
-        // Проверка что сервер не остановлен
-        if (m_stopped)
-        {
-            return;
-        }
-
-        // Складываем задачу в очередь
-        m_queue.push(Task { context, std::move(handler) });
-    }
-
-    // Будим один worker поток
-    m_conditionVariable.notify_one();
+    return m_requestTracker->waitingClientIds();
 }
 
-void Server::workerLoop()
+std::vector<Server::CommandReport> Server::clientReports(const std::uint64_t clientId) const
 {
-    while (true)
-    {
-        Task task;
-
-        {
-            std::unique_lock<std::mutex> lock { m_mutex };
-
-            // Ожидаем появление задачи
-            m_conditionVariable.wait(lock, [this]()
-            {
-                return m_stopped || !m_queue.empty();
-            });
-
-            if (m_stopped && m_queue.empty())
-            {
-                return;
-            }
-
-            task = std::move(m_queue.front());
-            m_queue.pop();
-        }
-
-        // Выполняем задачу
-        task.handler(task.context);
-    }
+    return m_requestTracker->clientReports(clientId);
 }
 
 void Server::executeSinSlow(const CommandContext context, const double angleRadians,
-    const SinSlowResultCallback& callback)
+    const SinSlowResultCallback& callback) const
 {
     const auto startedAt { std::chrono::steady_clock::now() };
 
     std::this_thread::sleep_for(std::chrono::milliseconds { 1000 });
     const double result { std::sin(angleRadians) };
     const CommandResult commandResult { makeCommandResult(context, startedAt) };
+
+    m_requestTracker->markCompleted(commandResult);
 
     if (callback)
     {
@@ -126,7 +67,7 @@ void Server::executeSinSlow(const CommandContext context, const double angleRadi
 }
 
 void Server::executeCosMedium(const CommandContext context, const double angleRadians,
-    const CosMediumResultCallback& callback)
+    const CosMediumResultCallback& callback) const
 {
     const auto startedAt { std::chrono::steady_clock::now() };
 
@@ -134,18 +75,22 @@ void Server::executeCosMedium(const CommandContext context, const double angleRa
     const double result { std::cos(angleRadians) };
     const CommandResult commandResult { makeCommandResult(context, startedAt) };
 
+    m_requestTracker->markCompleted(commandResult);
+
     if (callback)
     {
         callback(commandResult, result);
     }
 }
 
-void Server::executeFast(const CommandContext context, const ResultCallback& callback)
+void Server::executeFast(const CommandContext context, const ResultCallback& callback) const
 {
     const auto startedAt { std::chrono::steady_clock::now() };
 
     std::this_thread::sleep_for(std::chrono::milliseconds { 100 });
     const CommandResult commandResult { makeCommandResult(context, startedAt) };
+
+    m_requestTracker->markCompleted(commandResult);
 
     if (callback)
     {

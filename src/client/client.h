@@ -19,7 +19,9 @@ public:
     void run();
 
 private:
+    // Отправка команды с присвоенным индексом
     void sendCommand(std::size_t index);
+    // Обработка результата выполненной команды
     void handleResult(std::chrono::steady_clock::time_point sentAt, const std::string& commandName,
                       const ClientNetwork::CommandResult& result);
     void printStatistics(std::chrono::steady_clock::time_point startedAt);

@@ -13,6 +13,10 @@ add_executable(async_client_server
         src/client/client_network.h
         src/fake_transport.cpp
         src/fake_transport.h
+        src/server/command_executor.cpp
+        src/server/command_executor.h
+        src/server/request_tracker.cpp
+        src/server/request_tracker.h
         src/server/server.cpp
         src/server/server.h
         src/server/server_network.cpp
